@@ -96,7 +96,7 @@ void log_process(int level, const char* fileName, int line, const char* msg, ...
     if (level < LogLevel) return;
 
     int64_t time = currentTimeMillis();
-    fprintf(stdout, "{\"level\":%d,\"time\":%" PRId64 ",\"source\":\"%s:%d\",\"msg\":\"%s\"", level, time, fileName, line,  msg);
+    fprintf(stderr, "{\"level\":%d,\"time\":%" PRId64 ",\"source\":\"%s:%d\",\"msg\":\"%s\"", level, time, fileName, line,  msg);
 
     va_list ap;
     va_start(ap, msg);
@@ -106,13 +106,13 @@ void log_process(int level, const char* fileName, int line, const char* msg, ...
         if (arg == NULL) break;
 
 
-        if (arg->type == LOG_INT) fprintf(stdout, ",\"%s\":%d", arg->key, arg->int_val);
-        else if (arg->type == LOG_UINT) fprintf(stdout, ",\"%s\": \"%#08x\"", arg->key, arg->uint_val);
-        else if (arg->type == LOG_STRING) fprintf(stdout, ",\"%s\":\"%s\"", arg->key, arg->char_val);
+        if (arg->type == LOG_INT) fprintf(stderr, ",\"%s\":%d", arg->key, arg->int_val);
+        else if (arg->type == LOG_UINT) fprintf(stderr, ",\"%s\": \"%#08x\"", arg->key, arg->uint_val);
+        else if (arg->type == LOG_STRING) fprintf(stderr, ",\"%s\":\"%s\"", arg->key, arg->char_val);
 
         log_field_free(arg);
     }
 
-    fprintf(stdout, "}\n");
-    fflush(stdout);
+    fprintf(stderr, "}\n");
+    fflush(stderr);
 }

@@ -7,7 +7,11 @@
 #include "d2_client.h"
 #include "d2_ptrs.h"
 #include "d2_structs.h"
+#include "d2data/d2_level.h"
 #include "json.h"
+#include "mapinfo.h"
+
+#include "cJSON.h"
 
 #define INPUT_BUFFER 1024
 
@@ -31,6 +35,9 @@ char *CliUsage = "\nUsage:\n"
     "    --difficulty [-d]    Game Difficulty [0: Normal, 1: Nightmare, 2:Hell]\n"
     "    --act [-a]           Dump a specific act [0: ActI, 1:ActII, 2: ActIII, 3: ActIV, 4: Act5]\n"
     "    --map [-m]           Dump a specific Map [0: Rogue Encampent ...]\n"
+    "    --numSeed [-n]       Dumps all maps from <seed> to <seed> + <numSeed>\n"
+    "    --rooms [-r]         Include room information in dump\n"
+    "    --collision [-c]     Include collision information in dump\n"
     "    --verbose [-v]       Increase logging level\n"
 
     "\nExamples:\n"
@@ -52,34 +59,80 @@ void dump_info(unsigned int seed, int difficulty, int actId, int mapId) {
 }
 
 
-void dump_maps(unsigned int seed, int difficulty, int actId, int mapId) {
+void dump_maps(unsigned int seed, int difficulty, int actId, int mapId, cJSON* mapsInfoArray, bool dumpRooms, bool dumpCollision) {
     int64_t totalTime = currentTimeMillis();
     int mapCount = 0;
+
     if (mapId > -1) {
         int64_t startTime = currentTimeMillis();
-        int res = d2_dump_map(seed, difficulty, mapId);
+        int res = d2_dump_map(seed, difficulty, mapId, NULL, dumpRooms, dumpCollision);
         if (res == 0) mapCount ++;
         int64_t duration = currentTimeMillis() - startTime;
         log_debug("Map:Generation", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("mapId", mapId), lk_i("duration", duration));
     } else {
-        for (int mapId = 0; mapId < 200; mapId++) {
+        for (int mapId = 0; mapId < 142; mapId++) {
             // Skip map if its not part of the current act
             if (actId > -1 && get_act(mapId) != actId) continue;
 
-            int64_t startTime = currentTimeMillis();
-            int res = d2_dump_map(seed, difficulty, mapId);
-            if (res == 0) mapCount ++;
-            if (res == 1) continue; // Failed to generate the map
+            switch (mapId){
+                case AreaLevel::RogueEncampment:
+                case AreaLevel::BloodMoor:
+                case AreaLevel::ColdPlains:
+                case AreaLevel::StonyField:
+                case AreaLevel::BurialGrounds:
+                
+                case AreaLevel::DarkWood:
+                case AreaLevel::BlackMarsh:
+                
+                case AreaLevel::LutGholein:
+                case AreaLevel::RockyWaste:
+                case AreaLevel::DryHills:
+                case AreaLevel::FarOasis:
+                case AreaLevel::LostCity:
+                
+                case AreaLevel::ArcaneSanctuary:
+                case AreaLevel::HallsOfTheDeadLevel2:
+                case AreaLevel::HallsOfTheDeadLevel3:
 
-            int64_t currentTime = currentTimeMillis();
-            int64_t duration = currentTime - startTime;
-            startTime = currentTime;
-            log_debug("Map:Generation", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId), lk_i("duration", duration));
+                case AreaLevel::KurastDocks:
+                case AreaLevel::SpiderForest:
+                case AreaLevel::GreatMarsh: 
+                case AreaLevel::FlayerJungle:               
+                case AreaLevel::LowerKurast:
+                case AreaLevel::KurastBazaar:
+                case AreaLevel::UpperKurast:
+                
+                case AreaLevel::HallsOfPain:
+                case AreaLevel::HallsOfVaught:
+
+                case AreaLevel::Harrogath:
+                case AreaLevel::BloodyFoothills:
+                case AreaLevel::FrigidHighlands:
+                case AreaLevel::ArreatPlateau:
+                // default:
+                {
+                    int64_t startTime = currentTimeMillis();
+                    int res = d2_dump_map(seed, difficulty, mapId, mapsInfoArray, dumpRooms, dumpCollision);
+                    if (res == 0) mapCount ++;
+                    if (res == 1){
+                        log_debug("Map:Generation Failed:", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId));
+                        continue; // Failed to generate the map
+                    }
+
+                    int64_t currentTime = currentTimeMillis();
+                    int64_t duration = currentTime - startTime;
+                    startTime = currentTime;
+                    //log_debug("Map:Generation", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId), lk_i("duration", duration));
+                }
+                default: 
+                    continue;
+            }
+
         }
     }
     int64_t duration = currentTimeMillis() - totalTime;
-    log_info("Map:Generation:Done", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("count", mapCount), lk_i("duration", duration));
-    printf("\n");
+    //log_debug("Map:Generation:Done", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("count", mapCount), lk_i("duration", duration));
+
 }
 
 
@@ -93,7 +146,10 @@ int main(int argc, char *argv[]) {
     char c[INPUT_BUFFER];
 
     char *gameFolder = NULL;
-    DWORD argSeed = 0xff00ff00;
+    DWORD argSeed = 0;
+    int numSeed = 1;
+    bool dumpRooms = false; 
+    bool dumpCollision = false;
     int argMapId = -1;
     int argDifficulty = 0;
     int argActId = -1;
@@ -103,6 +159,16 @@ int main(int argc, char *argv[]) {
         if (starts_with(arg, "--seed") || starts_with(arg, "-s")) {
             sscanf(argv[++i], "%u", &argSeed);
             log_debug("Cli:Arg", lk_ui("seed", argSeed));
+            foundArgs ++;
+        } else if (starts_with(arg, "--rooms") || starts_with(arg, "-r")) {
+            log_debug("Cli:Arg", lk_b("rooms", true));
+            dumpRooms = true;
+        }else if (starts_with(arg, "--collision") || starts_with(arg, "-c")) {
+            log_debug("Cli:Arg", lk_b("collision", true));
+            dumpCollision = true;
+        }else if (starts_with(arg, "--numSeed") || starts_with(arg, "-n")) {
+            numSeed = atoi(argv[++i]);
+            log_debug("Cli:Arg", lk_i("numSeed", numSeed));
             foundArgs ++;
         } else if (starts_with(arg, "--difficulty") || starts_with(arg, "-d")) {
             argDifficulty = atoi(argv[++i]);
@@ -142,44 +208,26 @@ int main(int argc, char *argv[]) {
     int64_t duration = currentTimeMillis() - initStartTime;
     log_info("Map:Init:Done", lk_s("version", GIT_VERSION), lk_s("hash", GIT_HASH), lk_i("duration", duration));
 
-    /** Seed/Diff has been passed in just generate the map that is required */
+    cJSON *mapsInfoArray;
+
     if (foundArgs > 0) {
-        if (argMapId > -1) dump_maps(argSeed, argDifficulty, -1, argMapId);
-        else if (argActId > -1) dump_maps(argSeed, argDifficulty, argActId, -1);
-        else dump_maps(argSeed, argDifficulty, -1, -1);
+        printf("[\n");
+        for (int i = argSeed; i < argSeed + numSeed; i++){
+            log_debug("Generating maps for seed: ", lk_ui("seed", i));
+           
+            mapsInfoArray = cJSON_CreateArray();            
+            dump_maps(i, argDifficulty, -1, -1, mapsInfoArray, dumpRooms, dumpCollision);
+            
+            printf("%s", cJSON_PrintUnformatted(mapsInfoArray));
+            if (i != argSeed + numSeed - 1) printf(",\n");
+
+            cJSON_Delete(mapsInfoArray);
+
+        }
+        printf("]");
         return 0;
     }
 
-    /** Init the D2 client using the provided path */
-    json_start();
-    json_key_value("type", "init");
-    json_end();
-    char buffer[INPUT_BUFFER];
-
-    int rtn;
-    /** Read in seed/Difficulty then generate all the maps */
-    while (fgets(buffer, INPUT_BUFFER, stdin) != NULL) {
-        if (starts_with(buffer, COMMAND_EXIT) == 1) return 0;
-
-        if (starts_with(buffer, COMMAND_MAP) == 1) {
-            dump_maps(argSeed, argDifficulty, argActId, argMapId);
-            argActId = -1;
-            argMapId = -1;
-            json_start();
-            json_key_value("type", "done");
-            json_end();
-        } else if (starts_with(buffer, COMMAND_SEED) == 1) {
-            rtn = sscanf(buffer, "%s %u", &c, &argSeed);
-            dump_info(argSeed, argDifficulty, argActId, argMapId);
-        } else if (starts_with(buffer, COMMAND_DIFF) == 1) {
-            rtn = sscanf(buffer, "%s %d", &c, &argDifficulty);
-            dump_info(argSeed, argDifficulty, argActId, argMapId);
-        } else if (starts_with(buffer, COMMAND_ACT) == 1) {
-            rtn = sscanf(buffer, "%s %d", &c, &argActId);
-            dump_info(argSeed, argDifficulty, argActId, argMapId);
-        }
-        printf("\n");
-    }
 
     return 0;
 }

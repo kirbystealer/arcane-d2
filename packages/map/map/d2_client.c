@@ -13,10 +13,13 @@
 #include "d2data/d2_npc_type.h"
 #include "d2data/d2_level.h"
 #include "json.h"
+#include "mapinfo.h"
 #include "log.h"
 #include "map.h"
 #include "offset.h"
 #include "d2_client_version.h"
+
+#include "cJSON.h"
 
 #define UNIT_TYPE_PLAYER 0
 #define UNIT_TYPE_NPC 1
@@ -289,49 +292,36 @@ char *get_object_class(int code, char* name, int operateFn) {
 }
 
 bool is_good_exit(Act *pAct, Level *pLevel, int exitId) {
-    // Act 1
-    // BloodMoor -> Den of evil
-    if (pLevel->dwLevelNo == AreaLevel::BloodMoor && exitId == AreaLevel::DenOfEvil) return true;
+    //log_debug("Checking exit", lk_i("mapId", pLevel->dwLevelNo), lk_s("mapName", lookup_level_name(pLevel->dwLevelNo)), lk_i("exitId", exitId), lk_s("exitName", lookup_level_name(exitId)));
 
-    // Tamoe Highlands -> Pit
-    if (pLevel->dwLevelNo == AreaLevel::TamoeHighland && exitId == AreaLevel::PitLevel1) return true;
-    // Black Forest -> ForgottenTower
-    if (pLevel->dwLevelNo == AreaLevel::BlackMarsh && exitId == AreaLevel::ForgottenTower) return true;
+    if (pLevel->dwLevelNo == AreaLevel::RogueEncampment && exitId == AreaLevel::BloodMoor) return true;
+    if (pLevel->dwLevelNo == AreaLevel::BloodMoor && exitId == AreaLevel::ColdPlains) return true;
+    if (pLevel->dwLevelNo == AreaLevel::ColdPlains && exitId == AreaLevel::StonyField) return true;
+    if (pLevel->dwLevelNo == AreaLevel::ColdPlains && exitId == AreaLevel::BurialGrounds) return true;
+    if (pLevel->dwLevelNo == AreaLevel::DarkWood && exitId == AreaLevel::BlackMarsh) return true;
+    if (pLevel->dwLevelNo == AreaLevel::BlackMarsh && exitId == AreaLevel::TamoeHighland) return true;
+    if (pLevel->dwLevelNo == AreaLevel::LutGholein && exitId == AreaLevel::RockyWaste) return true;
+    if (pLevel->dwLevelNo == AreaLevel::RockyWaste && exitId == AreaLevel::DryHills) return true;
+    if (pLevel->dwLevelNo == AreaLevel::DryHills && exitId == AreaLevel::FarOasis) return true;
+    if (pLevel->dwLevelNo == AreaLevel::FarOasis && exitId == AreaLevel::LostCity) return true;
+    if (pLevel->dwLevelNo == AreaLevel::HallsOfPain && exitId == AreaLevel::HallsOfVaught) return true;
 
-    // Act 2
-    // Correct tomb
-    if (exitId == pAct->pMisc->dwStaffTombLevel) return true;
-    // Staff Components
-    if (pLevel->dwLevelNo == AreaLevel::FarOasis && exitId == AreaLevel::MaggotLairLevel1) return true;
-    if (pLevel->dwLevelNo == AreaLevel::ValleyOfSnakes && exitId == AreaLevel::ClawViperTempleLevel1) return true;
-    if (pLevel->dwLevelNo == AreaLevel::RockyWaste && exitId == AreaLevel::StonyTombLevel1) return true;
 
-    // Ancient tunnels
-    if (pLevel->dwLevelNo == AreaLevel::LostCity && exitId == AreaLevel::AncientTunnels) return true;
-
-    // Act 3
-    // Parts
-    if (pLevel->dwLevelNo == AreaLevel::SpiderForest && exitId == AreaLevel::SpiderCavern) return true;
-    if (pLevel->dwLevelNo == AreaLevel::FlayerJungle && exitId == AreaLevel::FlayerDungeonLevel1) return true;
-
-    // Kurast -> RuinedTemple 
-    if (pLevel->dwLevelNo == AreaLevel::KurastBazaar && exitId == AreaLevel::RuinedTemple) return true;
-
-    // Act 5
-    // Crystaline passage -> Frozen River
-    if (pLevel->dwLevelNo == AreaLevel::CrystallinePassage && exitId == AreaLevel::FrozenRiver) return true;
 
     return false;
 }
 
-int dump_objects(Act *pAct, Level *pLevel, Room2 *pRoom2) {
+MapInfoObjects dump_objects(Act *pAct, Level *pLevel, Room2 *pRoom2, int roomIndex) {
     int offsetX = pLevel->dwPosX * 5;
     int offsetY = pLevel->dwPosY * 5;
 
     int roomOffsetX = pRoom2->dwPosX * 5 - offsetX;
     int roomOffsetY = pRoom2->dwPosY * 5 - offsetY;
 
+    MapInfoObjects objects;
+
     for (PresetUnit *pPresetUnit = pRoom2->pPreset; pPresetUnit; pPresetUnit = pPresetUnit->pPresetNext) {
+        MapInfoObject object;
         char *objectType = NULL;
         char *objectName = NULL;
         char *objectClass = NULL;
@@ -343,45 +333,82 @@ int dump_objects(Act *pAct, Level *pLevel, Room2 *pRoom2) {
         int coordX = roomOffsetX + pPresetUnit->dwPosX;
         int coordY = roomOffsetY + pPresetUnit->dwPosY;
 
-        if (pPresetUnit->dwType == UNIT_TYPE_NPC) {
-            if (npc_is_useless(pPresetUnit->dwTxtFileNo)) continue;
-            objectType = "npc";
-            objectId = pPresetUnit->dwTxtFileNo;
+        switch(pPresetUnit->dwType){
+            case UNIT_TYPE_NPC:{
+                if (npc_is_useless(pPresetUnit->dwTxtFileNo)) continue;
+                if (pPresetUnit->dwTxtFileNo != NpcCode::Summoner && 
+                    pPresetUnit->dwTxtFileNo != NpcCode::Nihlathak &&
+                    pPresetUnit->dwTxtFileNo != NpcCode::Akara && 
+                    pPresetUnit->dwTxtFileNo != NpcCode::Atma &&
+                    pPresetUnit->dwTxtFileNo != NpcCode::Warriv2 &&
+                    pPresetUnit->dwTxtFileNo != NpcCode::Meshif) continue;
+                objectType = "npc";
+                objectName = lookup_npc_name(pPresetUnit->dwTxtFileNo);
+                objectId = pPresetUnit->dwTxtFileNo;
+                break;
+            }
+            case UNIT_TYPE_OBJECT:{
+                objectType = get_object_type(pPresetUnit->dwTxtFileNo);
+                if (!objectType) continue;
 
-        } else if (pPresetUnit->dwType == UNIT_TYPE_OBJECT) {
-            objectType = get_object_type(pPresetUnit->dwTxtFileNo);
-            if (!objectType) continue;
-            objectId = pPresetUnit->dwTxtFileNo;
-            if (pPresetUnit->dwTxtFileNo < 580) {
-                ObjectTxt *txt = d2common_get_object_txt(gameVersion, pPresetUnit->dwTxtFileNo);
-                objectName = txt->szName;
-                if (txt->nSelectable0) operateFn = txt->nOperateFn;
-            }
-            objectClass = get_object_class(pPresetUnit->dwTxtFileNo, objectName, operateFn);
-        } else if (pPresetUnit->dwType == UNIT_TYPE_TILE) {
-            for (RoomTile *pRoomTile = pRoom2->pRoomTiles; pRoomTile; pRoomTile = pRoomTile->pNext) {
-                if (*pRoomTile->nNum == pPresetUnit->dwTxtFileNo) {
-                    objectId = pRoomTile->pRoom2->pLevel->dwLevelNo;
-                    if (is_good_exit(pAct, pLevel, objectId)) isGoodExit = true;
-                    objectType = "exit";
+                objectId = pPresetUnit->dwTxtFileNo;
+                if (pPresetUnit->dwTxtFileNo < 580) {
+                    objectId = pPresetUnit->dwTxtFileNo;
+                    ObjectTxt *txt = d2common_get_object_txt(gameVersion, pPresetUnit->dwTxtFileNo);
+                    objectName = txt->szName;
+                    if (txt->nSelectable0) operateFn = txt->nOperateFn;      
+
+                             
+                } else {
+                    break;
                 }
+
+                
+
+                // if (operateFn == 23){
+                //     objectType = "waypoint";
+                // } else {
+                //     objectType = NULL;
+                // }
+                break;
+            } 
+            case UNIT_TYPE_TILE:{
+                for (RoomTile *pRoomTile = pRoom2->pRoomTiles; pRoomTile; pRoomTile = pRoomTile->pNext) {
+                    if (*pRoomTile->nNum == pPresetUnit->dwTxtFileNo) {
+                        objectId = pRoomTile->pRoom2->pLevel->dwLevelNo;                        
+                        objectName = lookup_level_name(objectId);
+                        objectType = "exit";
+                    }
+                }
+                break; 
             }
+            default:
+                log_debug("No operation found for unit type", lk_i("unitType", pPresetUnit->dwType));
+                break;
+                            
         }
 
-        if (objectType) {
-            json_object_start();
-            json_key_value("id", objectId);
-            json_key_value("type", objectType);
-            json_key_value("x", coordX);
-            json_key_value("y", coordY);
-            if (objectName) json_key_value("name", objectName);
-            if (operateFn > -1) json_key_value("op", operateFn);
-            if (isGoodExit) json_key_value("isGoodExit", true);
-            if (objectClass) json_key_value("class", objectClass);
-            json_object_end();
+
+        if (objectType && objectName) {
+            object.roomIndex = roomIndex;
+            object.roomNumber = pRoom2->pType2Info->dwRoomNumber;
+            object.id = objectId;
+            object.type = objectType;
+            object.x = coordX;
+            object.y = coordY;
+            object.name = objectName;
+            objects.push_back(object);
+            
+            // log_debug("ObjectUnit: ", 
+            //         lk_i("id", objectId),
+            //         lk_s("name", objectName),
+            //         lk_s("type", objectType),
+            //         lk_i("x", coordX),
+            //         lk_i("y", coordY)
+            //         );   
         }
     }
-    return 0;
+    return objects;
 }
 
 void dump_map_collision(int width, int height) {
@@ -422,7 +449,105 @@ int get_act(int levelCode) {
     return -1;
 }
 
-int d2_dump_map(int seed, int difficulty, int levelCode) {
+static void map_info_to_json(MapInfo* mapInfo, int seed, int difficulty, cJSON* mapsInfoArray, bool dumpRooms, bool dumpCollision){
+    cJSON *mapObjects = NULL;
+    cJSON *mapRooms = NULL;
+    cJSON *mapCollision = NULL;
+
+    cJSON *info = cJSON_CreateObject();
+
+    if (cJSON_AddStringToObject(info, "type", "map") == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "seed", seed) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "difficulty", difficulty) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "id", mapInfo->id) == NULL) goto end;
+    if (cJSON_AddStringToObject(info, "name", mapInfo->name) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "offsetX", mapInfo->offsetX) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "offsetY", mapInfo->offsetY) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "width", mapInfo->width) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "height", mapInfo->height) == NULL) goto end;
+
+    if (dumpRooms){
+        mapRooms = cJSON_AddArrayToObject(info, "rooms");
+
+        for (MapInfoRooms::iterator iter = mapInfo->rooms.begin(); iter != mapInfo->rooms.end(); ++iter)
+        {
+            cJSON *mapRoom = cJSON_CreateObject();
+
+            if (cJSON_AddNumberToObject(mapRoom, "roomIndex", iter->roomIndex) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "roomNumber", iter->roomNumber) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "roomFlags", iter->roomFlags) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "roomPresetType", iter->presetType) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "x", iter->x) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "y", iter->y) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "width", iter->width) == NULL) goto end;
+            if (cJSON_AddNumberToObject(mapRoom, "height", iter->height) == NULL) goto end;
+
+
+            cJSON_AddItemToArray(mapRooms, mapRoom);
+        }
+    }
+
+    if (dumpCollision){
+        
+        int width = mapInfo->width;
+        int height = mapInfo->height;
+        int maxY = map_max_y();
+        int maxX = map_max_x();
+        mapCollision = cJSON_AddArrayToObject(info, "collision");
+        cJSON* mapCollisionRow = NULL;
+        for (int y = 0; y <= maxY; y++) {
+
+            char last = 'X';
+            int count = 0;
+            int outputCount = 0;
+            mapCollisionRow = cJSON_CreateArray();
+
+            for (int x = 0; x < width; x++) {
+                char mapVal = map_value(x, y) % 2 ? 'X' : ' ';
+                if (mapVal == last) {
+                    count++;
+                    continue;
+                }
+
+                if (outputCount == 0 && last == ' '){
+                    cJSON_AddItemToArray(mapCollisionRow, cJSON_CreateNumber(-1));
+                }
+
+              
+
+                cJSON_AddItemToArray(mapCollisionRow, cJSON_CreateNumber(count));
+
+                outputCount++;
+                count = 1;
+                last = mapVal;
+            }
+            cJSON_AddItemToArray(mapCollision, mapCollisionRow);
+            // if (maxX < width) 
+        }
+
+    }
+
+    mapObjects = cJSON_AddArrayToObject(info, "objects");
+
+    for (MapInfoObjects::iterator iter = mapInfo->objects.begin(); iter != mapInfo->objects.end(); ++iter)
+    {
+        cJSON *mapObject = cJSON_CreateObject();
+
+        if (cJSON_AddStringToObject(mapObject, "type", iter->type) == NULL) goto end;
+        if (cJSON_AddNumberToObject(mapObject, "roomIndex", iter->roomIndex) == NULL) goto end;
+        if (cJSON_AddNumberToObject(mapObject, "roomNumber", iter->roomNumber) == NULL) goto end;        
+        if (cJSON_AddNumberToObject(mapObject, "id", iter->id) == NULL) goto end;
+        if (cJSON_AddNumberToObject(mapObject, "x", iter->x) == NULL) goto end;
+        if (cJSON_AddNumberToObject(mapObject, "y", iter->y) == NULL) goto end;
+        if (cJSON_AddStringToObject(mapObject, "name", iter->name) == NULL) goto end;
+
+        cJSON_AddItemToArray(mapObjects, mapObject);
+    }
+    end:
+        cJSON_AddItemToArray(mapsInfoArray, info);
+}
+
+int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, bool dumpRooms, bool dumpCollision) {
     LevelTxt *levelData = d2common_get_level_text(gameVersion, levelCode); 
     if (!levelData) return 1;
 
@@ -470,38 +595,42 @@ int d2_dump_map(int seed, int difficulty, int levelCode) {
     log_trace("MapInit", lk_i("actId", actId), lk_i("mapId", levelCode), lk_s("mapName", levelName), lk_i("originY", originY), lk_i("originX", originX), lk_i("width", mapWidth), lk_i("height", mapHeight));
     map_reset();
 
-    // Start JSON DUMP
-    json_start();
-    json_key_value("type", "map");
-    json_key_value("id", levelCode);
-    json_key_value("name", levelName);
 
-    json_object_start("offset");
-    json_key_value("x", originX);
-    json_key_value("y", originY);
-    json_object_end();
-
-    json_object_start("size");
-    json_key_value("width", mapWidth);
-    json_key_value("height", mapHeight);
-    json_object_end();
-
-    json_array_start("objects");
-
+    int roomIndex = 0;
+    MapInfoObjects mapObjects;
+    MapInfoObjects roomObjects;
+    MapInfoRooms mapRooms;
+    MapInfoRoom mapRoom;
     for (Room2 *pRoom2 = pLevel->pRoom2First; pRoom2; pRoom2 = pRoom2->pRoom2Next) {
         BOOL bAdded = !pRoom2->pRoom1;
 
         if (bAdded) d2common_add_room_data(gameVersion, pAct, pLevel, pRoom2);
-        dump_objects(pAct, pLevel, pRoom2);
+        
+        roomObjects = dump_objects(pAct, pLevel, pRoom2, roomIndex);
+
+        mapRoom.roomIndex = roomIndex;
+        mapRoom.roomNumber = pRoom2->pType2Info->dwRoomNumber;
+        mapRoom.roomFlags = pRoom2->dwRoomFlags;
+        mapRoom.presetType = pRoom2->dwPresetType;
+        mapRoom.x = pRoom2->pRoom1->dwPosX;
+        mapRoom.y = pRoom2->pRoom1->dwPosY;
+        mapRoom.width = pRoom2->pRoom1->dwSizeX;
+        mapRoom.height = pRoom2->pRoom1->dwSizeY;
+       
+        mapRooms.push_back(mapRoom);
+
+        for (MapInfoObjects::iterator iter = roomObjects.begin(); iter != roomObjects.end(); ++iter) {
+            mapObjects.push_back(*iter);
+        }
 
         if (pRoom2->pRoom1) add_collision_data(pRoom2->pRoom1->Coll, originX, originY);
         if (bAdded) d2common_remove_room_data(gameVersion, pAct, pLevel, pRoom2);
+        roomIndex += 1;
     }
 
-    json_array_end();
-    json_array_start("map");
-    dump_map_collision(mapWidth, mapHeight);
-    json_array_end();
-    json_end();
+    MapInfo mapInfo = {"map", seed, difficulty, levelCode, levelName, originX, originY, mapWidth, mapHeight, mapRooms, mapObjects};
+    log_trace("MapDump");
+
+    map_info_to_json(&mapInfo, seed, difficulty, mapsInfoArray, dumpRooms, dumpCollision);
     return 0;
 }
