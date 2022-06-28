@@ -148,7 +148,11 @@ struct Level {
     Level *pNextLevel;   //0x1AC
     DWORD _4;            //0x1B0
     ActMisc *pMisc;      //0x1B4
-    DWORD _5[6];         //0x1BC
+    DWORD _5[2];         //0x1BC
+    DWORD dwLevelType;   //0x1C0
+    DWORD hiSeed;        //0x1C4
+    DWORD loSeed;        //0x1C8
+    DWORD pLevelPresets; //0x1CC
     DWORD dwLevelNo;     //0x1D0
 };
 

@@ -7,10 +7,11 @@ GIT_HASH=${GIT_HASH:-$(git rev-parse HEAD)}
 echo $GIT_VERSION
 echo $GIT_HASH
 
-i686-w64-mingw32-g++ -ggdb -gdwarf-2 -fno-omit-frame-pointer -o bin/d2-map.exe \
+i686-w64-mingw32-g++ -g -o bin/d2-map.exe \
     -Wno-write-strings \
+    -masm=intel \
     -static-libgcc -static-libstdc++ \
     -DGIT_VERSION=\"${GIT_VERSION}\" \
     -DGIT_HASH=\"${GIT_HASH}\" \
-    map/json.c map/log.c map/map.c map/offset.c map/d2_client.c map/main.c map/cJSON.c
+    map/json.c map/log.c map/map.c map/offset.c map/dll_patches.c map/cJSON.c map/d2_client.c map/main.c 
 echo $(date --iso-8601=seconds) "Build done" $GIT_VERSION $GIT_HASH

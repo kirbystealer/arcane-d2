@@ -10,6 +10,7 @@
 #include "d2data/d2_level.h"
 #include "json.h"
 #include "mapinfo.h"
+#include "dll_patches.h"
 
 #include "cJSON.h"
 
@@ -58,8 +59,55 @@ void dump_info(unsigned int seed, int difficulty, int actId, int mapId) {
     json_end();
 }
 
+bool is_arcane_map(int mapId){
+    switch(mapId){
+        // case AreaLevel::RogueEncampment:
+        // case AreaLevel::BloodMoor:
+        // case AreaLevel::ColdPlains:
+        // case AreaLevel::StonyField:
+        // case AreaLevel::BurialGrounds:
+        
+        // case AreaLevel::DarkWood:
+        // case AreaLevel::BlackMarsh:
+        
+        // case AreaLevel::LutGholein:
+        // case AreaLevel::RockyWaste:
+        // case AreaLevel::DryHills:
+        // case AreaLevel::FarOasis:
+        // case AreaLevel::LostCity:
+        
+        // case AreaLevel::ArcaneSanctuary:
+        // case AreaLevel::HallsOfTheDeadLevel2:
+        // case AreaLevel::HallsOfTheDeadLevel3:
 
-void dump_maps(unsigned int seed, int difficulty, int actId, int mapId, cJSON* mapsInfoArray, bool dumpRooms, bool dumpCollision) {
+        // case AreaLevel::KurastDocks:
+        // case AreaLevel::SpiderForest:
+        // case AreaLevel::GreatMarsh: 
+        // case AreaLevel::FlayerJungle:               
+        // case AreaLevel::LowerKurast:
+        // case AreaLevel::KurastBazaar:
+        // case AreaLevel::UpperKurast:
+        
+        // case AreaLevel::HallsOfPain:
+        // case AreaLevel::HallsOfVaught:
+
+        // case AreaLevel::Harrogath:
+        // case AreaLevel::BloodyFoothills:
+        // case AreaLevel::FrigidHighlands:
+        // case AreaLevel::ArreatPlateau:
+
+        // case AreaLevel::TheAncientsWay: // Glacial Caves
+
+        case AreaLevel::ClawViperTempleLevel1:
+            return true;
+        default:
+            return false;
+    }
+    
+}
+
+
+void dump_maps(unsigned int seed, int difficulty, int actId, int mapId, cJSON* mapsInfoArray, bool dumpRooms, bool dumpCollision, bool arcaneMapsOnly) {
     int64_t totalTime = currentTimeMillis();
     int mapCount = 0;
 
@@ -70,64 +118,28 @@ void dump_maps(unsigned int seed, int difficulty, int actId, int mapId, cJSON* m
         int64_t duration = currentTimeMillis() - startTime;
         log_debug("Map:Generation", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("mapId", mapId), lk_i("duration", duration));
     } else {
-        for (int mapId = 0; mapId < 142; mapId++) {
+        for (int mapId = 1; mapId <= 136; mapId++) {
             // Skip map if its not part of the current act
             if (actId > -1 && get_act(mapId) != actId) continue;
 
-            switch (mapId){
-                case AreaLevel::RogueEncampment:
-                case AreaLevel::BloodMoor:
-                case AreaLevel::ColdPlains:
-                case AreaLevel::StonyField:
-                case AreaLevel::BurialGrounds:
-                
-                case AreaLevel::DarkWood:
-                case AreaLevel::BlackMarsh:
-                
-                case AreaLevel::LutGholein:
-                case AreaLevel::RockyWaste:
-                case AreaLevel::DryHills:
-                case AreaLevel::FarOasis:
-                case AreaLevel::LostCity:
-                
-                case AreaLevel::ArcaneSanctuary:
-                case AreaLevel::HallsOfTheDeadLevel2:
-                case AreaLevel::HallsOfTheDeadLevel3:
+            // Skip map if we only want arcane maps
+            if(arcaneMapsOnly && !is_arcane_map(mapId)) continue;
 
-                case AreaLevel::KurastDocks:
-                case AreaLevel::SpiderForest:
-                case AreaLevel::GreatMarsh: 
-                case AreaLevel::FlayerJungle:               
-                case AreaLevel::LowerKurast:
-                case AreaLevel::KurastBazaar:
-                case AreaLevel::UpperKurast:
-                
-                case AreaLevel::HallsOfPain:
-                case AreaLevel::HallsOfVaught:
+            int64_t startTime = currentTimeMillis();
 
-                case AreaLevel::Harrogath:
-                case AreaLevel::BloodyFoothills:
-                case AreaLevel::FrigidHighlands:
-                case AreaLevel::ArreatPlateau:
-                // default:
-                {
-                    int64_t startTime = currentTimeMillis();
-                    int res = d2_dump_map(seed, difficulty, mapId, mapsInfoArray, dumpRooms, dumpCollision);
-                    if (res == 0) mapCount ++;
-                    if (res == 1){
-                        log_debug("Map:Generation Failed:", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId));
-                        continue; // Failed to generate the map
-                    }
 
-                    int64_t currentTime = currentTimeMillis();
-                    int64_t duration = currentTime - startTime;
-                    startTime = currentTime;
-                    //log_debug("Map:Generation", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId), lk_i("duration", duration));
-                }
-                default: 
-                    continue;
+            int res = d2_dump_map(seed, difficulty, mapId, mapsInfoArray, dumpRooms, dumpCollision);
+        
+            if (res == 0) mapCount ++;
+            if (res == 1){
+                log_debug("Map:Generation Failed:", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId));
+                continue; // Failed to generate the map
             }
 
+            int64_t currentTime = currentTimeMillis();
+            int64_t duration = currentTime - startTime;
+            startTime = currentTime;
+            //log_debug("Map:Generation", lk_ui("seed", seed), lk_i("difficulty", difficulty), lk_i("actId", get_act(mapId)), lk_i("mapId", mapId), lk_i("duration", duration));
         }
     }
     int64_t duration = currentTimeMillis() - totalTime;
@@ -150,6 +162,7 @@ int main(int argc, char *argv[]) {
     int numSeed = 1;
     bool dumpRooms = false; 
     bool dumpCollision = false;
+    bool arcaneMapsOnly = false;
     int argMapId = -1;
     int argDifficulty = 0;
     int argActId = -1;
@@ -166,6 +179,9 @@ int main(int argc, char *argv[]) {
         }else if (starts_with(arg, "--collision") || starts_with(arg, "-c")) {
             log_debug("Cli:Arg", lk_b("collision", true));
             dumpCollision = true;
+        }else if (starts_with(arg, "--arcane")) {
+            log_debug("Cli:Arg", lk_b("arcaneMapsOnly", true));
+            arcaneMapsOnly = true;            
         }else if (starts_with(arg, "--numSeed") || starts_with(arg, "-n")) {
             numSeed = atoi(argv[++i]);
             log_debug("Cli:Arg", lk_i("numSeed", numSeed));
@@ -215,19 +231,24 @@ int main(int argc, char *argv[]) {
         for (int i = argSeed; i < argSeed + numSeed; i++){
             log_debug("Generating maps for seed: ", lk_ui("seed", i));
            
-
-            mapsInfoArray = cJSON_CreateArray();            
-            dump_maps(i, argDifficulty, -1, -1, mapsInfoArray, dumpRooms, dumpCollision);
-            char* jsonOutput = cJSON_PrintUnformatted(mapsInfoArray);
+                int j = 14;
+            // for (int j = 0; j < 15; j++){       
+                // D2CommonMazeIncrement = j;
+                mapsInfoArray = cJSON_CreateArray();     
+                dump_maps(i, argDifficulty, -1, -1, mapsInfoArray, dumpRooms, dumpCollision, arcaneMapsOnly);
             
-            if (i != argSeed + numSeed - 1){
-                printf("%s,\n", jsonOutput);            
-            } else {
-                printf("%s", jsonOutput);
-            }
+                char* jsonOutput = cJSON_PrintUnformatted(mapsInfoArray);
+                
+                if (i == argSeed + numSeed - 1 && j == 14){
+                    printf("%s\n", jsonOutput);            
+                } else {
+                    printf("%s,\n", jsonOutput);
+                }
 
-            cJSON_free(jsonOutput);
-            cJSON_Delete(mapsInfoArray);
+                cJSON_free(jsonOutput);
+                cJSON_Delete(mapsInfoArray);
+            // }
+            // printf("\n")
 
         }
         printf("\n]");

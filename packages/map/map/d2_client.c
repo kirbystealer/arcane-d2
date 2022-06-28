@@ -17,6 +17,7 @@
 #include "log.h"
 #include "map.h"
 #include "offset.h"
+#include "dll_patches.h"
 #include "d2_client_version.h"
 
 #include "cJSON.h"
@@ -51,16 +52,14 @@ D2Version gameVersion = VersionUnknown;
 int D2CLIENT_Pod_InitGameMisc_I_P = 0x6faf559b;
 void /* __declspec(naked) */ D2CLIENT_Pod_InitGameMisc() {
     __asm(
-        "MOVL %EBP, %ESP\n"
-        "POPL %EBP\n"
-        ".intel_syntax noprefix\n"
+        "MOV EBP, ESP\n"
+        "POP EBP\n"
         "PUSH ECX\n"
         "PUSH EBP\n"
         "PUSH ESI\n"
-        "PUSH EDI\n"
-        ".att_syntax prefix\n"
+        "PUSH EDI\n"        
         "JMP 0x6faf559b\n"  // Magic Jump
-        "PUSHL %EBP\n");
+        "PUSH EBP\n");
 }
 
 // bool isPathOfDiablo = false;
@@ -100,16 +99,14 @@ void d2_game_init_pod() {
 int D2CLIENT_Pd2_InitGameMisc_I_P = 0x6faf454b;
 void /* __declspec(naked) */ D2CLIENT_Pd2_InitGameMisc() {
     __asm(
-        "MOVL %EBP, %ESP\n"
-        "POPL %EBP\n"
-        ".intel_syntax noprefix\n"
+        "MOV EBP, ESP\n"
+        "POP EBP\n"
         "PUSH ECX\n"
         "PUSH EBP\n"
         "PUSH ESI\n"
-        "PUSH EDI\n"
-        ".att_syntax prefix\n"
+        "PUSH EDI\n"        
         "JMP 0x6faf454b\n"  // Magic Jump
-        "PUSHL %EBP\n");
+        "PUSH EBP\n");
 }
 bool isProjectDiablo2 = false;
 void d2_game_init_pd2() {
@@ -186,6 +183,11 @@ void d2_game_init(char *folderName) {
 
     DefineOffsets();
     log_debug("Init:Offsets:Defined");
+
+    // fprintf(stderr, "Press Any Key to Continue\n");
+    // getchar();
+
+    // PatchDlls();
 
     if (gameVersion == VersionPathOfDiablo) {
         d2_game_init_pod();
@@ -460,8 +462,11 @@ static void map_info_to_json(MapInfo* mapInfo, int seed, int difficulty, cJSON* 
 
     cJSON *info = cJSON_CreateObject();
 
+
+
     if (cJSON_AddStringToObject(info, "type", "map") == NULL) goto end;
     if (cJSON_AddNumberToObject(info, "seed", seed) == NULL) goto end;
+    if (cJSON_AddNumberToObject(info, "mazeIncrement", D2CommonMazeIncrement) == NULL) goto end;
     if (cJSON_AddNumberToObject(info, "difficulty", difficulty) == NULL) goto end;
     if (cJSON_AddNumberToObject(info, "id", mapInfo->id) == NULL) goto end;
     if (cJSON_AddStringToObject(info, "name", mapInfo->name) == NULL) goto end;
@@ -592,7 +597,21 @@ int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, b
         return 1;
     }
 
+    char hiSeedPre[32];
+    char loSeedPre[32];
+    char hiSeedPost[32];
+    char loSeedPost[32];
+
+    sprintf(hiSeedPre, "%u", pLevel->hiSeed);
+    sprintf(loSeedPre, "%u", pLevel->loSeed);
+
     if (!pLevel->pRoom2First) d2common_init_level(gameVersion, pLevel); 
+
+    pLevel = d2_get_level(pAct->pMisc, levelCode);
+    sprintf(hiSeedPost, "%u", pLevel->hiSeed);
+    sprintf(loSeedPost, "%u", pLevel->loSeed);
+
+
     if (!pLevel->pRoom2First) {
         log_warn("Map:SkippingLevel:FailedRoomLoading", lk_i("mapId", levelCode), lk_s("mapName", levelName));
         return 1;
@@ -604,7 +623,21 @@ int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, b
     int mapWidth = pLevel->dwSizeX * 5;
     int mapHeight = pLevel->dwSizeY * 5;
 
-    log_trace("MapInit", lk_i("actId", actId), lk_i("mapId", levelCode), lk_s("mapName", levelName), lk_i("originY", originY), lk_i("originX", originX), lk_i("width", mapWidth), lk_i("height", mapHeight));
+
+    
+    log_trace("MapInit", 
+        lk_i("actId", actId), 
+        lk_i("mapId", levelCode), 
+        lk_s("mapName", levelName),
+        lk_s("hiSeedPre", hiSeedPre), 
+        lk_s("loSeedPre", loSeedPre), 
+        lk_s("hiSeedPost", hiSeedPost), 
+        lk_s("loSeedPost", loSeedPost),
+        lk_i("originY", originY), 
+        lk_i("originX", originX), 
+        lk_i("width", mapWidth), 
+        lk_i("height", mapHeight)
+    );
     map_reset();
 
 
@@ -639,6 +672,12 @@ int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, b
         if (bAdded) d2common_remove_room_data(gameVersion, pAct, pLevel, pRoom2);
         roomIndex += 1;
     }
+
+    log_trace("MapPostRooms", 
+        lk_i("mapId", levelCode), 
+        lk_s("mapName", levelName), 
+        lk_i("nRooms", mapRooms.size())
+    );
 
     int *map;
     int nihlathakDirection = 0;
