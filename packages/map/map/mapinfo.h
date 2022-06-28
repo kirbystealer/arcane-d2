@@ -44,6 +44,7 @@ typedef struct
     int offsetY;
     int width;
     int height;
+    int nihlathakDirection;
     MapInfoRooms rooms;
     MapInfoObjects objects;
 } MapInfo;

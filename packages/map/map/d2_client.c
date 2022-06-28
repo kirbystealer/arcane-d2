@@ -212,7 +212,8 @@ Level *__fastcall d2_get_level(ActMisc *misc, DWORD levelCode) {
     return d2common_get_level(gameVersion, misc, levelCode);
 }
 
-void add_collision_data(CollMap *pCol, int originX, int originY) {
+void add_collision_data(Room2 *pRoom2, int originX, int originY) {
+    CollMap *pCol = pRoom2->pRoom1->Coll;
     if (pCol == NULL) return;
 
     int x = pCol->dwPosGameX - originX;
@@ -224,6 +225,8 @@ void add_collision_data(CollMap *pCol, int originX, int originY) {
     int nLimitY = y + cy;
 
     WORD *p = pCol->pMapStart;
+
+
     for (int j = y; j < nLimitY; j++) {
         for (int i = x; i < nLimitX; i++) {
             int pVal = *p;
@@ -232,6 +235,7 @@ void add_collision_data(CollMap *pCol, int originX, int originY) {
             p++;
         }
     }
+    
 }
 
 char *get_object_type(int code) {
@@ -466,6 +470,10 @@ static void map_info_to_json(MapInfo* mapInfo, int seed, int difficulty, cJSON* 
     if (cJSON_AddNumberToObject(info, "width", mapInfo->width) == NULL) goto end;
     if (cJSON_AddNumberToObject(info, "height", mapInfo->height) == NULL) goto end;
 
+    if (mapInfo->id == AreaLevel::HallsOfVaught){
+        if (cJSON_AddNumberToObject(info, "nihlathakDirection", mapInfo->nihlathakDirection) == NULL) goto end;
+    }
+
     if (dumpRooms){
         mapRooms = cJSON_AddArrayToObject(info, "rooms");
 
@@ -623,12 +631,32 @@ int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, b
             mapObjects.push_back(*iter);
         }
 
-        if (pRoom2->pRoom1) add_collision_data(pRoom2->pRoom1->Coll, originX, originY);
+        if (pRoom2->pRoom1) add_collision_data(pRoom2, originX, originY);
         if (bAdded) d2common_remove_room_data(gameVersion, pAct, pLevel, pRoom2);
         roomIndex += 1;
     }
 
-    MapInfo mapInfo = {"map", seed, difficulty, levelCode, levelName, originX, originY, mapWidth, mapHeight, mapRooms, mapObjects};
+    // There's only 4 collision maps for HallsOfVaught, so we just need a number that uniquely identifies which array we've got.
+    // Should just indentify by the first different index at some stage instead of this stuff.
+    int *map;
+    int nihlathakDirection = 0;
+    if (pLevel->dwLevelNo == AreaLevel::HallsOfVaught){
+        map = map_get();
+        for (int i = 0; i < 1500 * 1500; i++){
+            if (map[i] > 0 ){
+                if (map[i] == 1){
+                    nihlathakDirection = (nihlathakDirection >> 1) & 0xFFFFFFFF;
+                } else if (map[i] == 5){
+                    nihlathakDirection = (nihlathakDirection * 5) & 0xFFFFFFFF;
+                } else if (map[i] == 7){
+                    nihlathakDirection = (nihlathakDirection + 7) & 0xFFFFFFFF;
+                }
+            }
+        }
+        nihlathakDirection &= 7;        
+    }
+
+    MapInfo mapInfo = {"map", seed, difficulty, levelCode, levelName, originX, originY, mapWidth, mapHeight, nihlathakDirection, mapRooms, mapObjects};
     log_trace("MapDump");
 
     map_info_to_json(&mapInfo, seed, difficulty, mapsInfoArray, dumpRooms, dumpCollision);

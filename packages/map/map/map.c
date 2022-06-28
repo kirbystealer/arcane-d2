@@ -32,6 +32,10 @@ void map_set(int x, int y, int value) {
     MAP[map_offset(x, y)] = value;
 }
 
+int* map_get(){
+    return MAP;
+}
+
 void map_reset() {
     MAX_SIZE_X = 0;
     MAX_SIZE_Y = 0;
