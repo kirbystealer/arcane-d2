@@ -116,7 +116,7 @@ void d2_game_init_pd2() {
 
     log_trace("Init:Dll", lk_s("dll", "Fog.dll"));
     FOG_10021("D2");
-    FOG_10019(DIABLO_2, (DWORD)ExceptionHandler, DIABLO_2_VERSION, 1);
+    // FOG_10019(DIABLO_2, (DWORD)ExceptionHandler, DIABLO_2_VERSION, 1);
     FOG_10101(1, 0);
     FOG_10089(1);
 
