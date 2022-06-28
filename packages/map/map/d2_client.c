@@ -474,6 +474,10 @@ static void map_info_to_json(MapInfo* mapInfo, int seed, int difficulty, cJSON* 
         if (cJSON_AddNumberToObject(info, "nihlathakDirection", mapInfo->nihlathakDirection) == NULL) goto end;
     }
 
+    if (mapInfo->id == AreaLevel::LowerKurast){
+        if (cJSON_AddNumberToObject(info, "lowerKurastExitSide", mapInfo->lowerKurastExitSide) == NULL) goto end;
+    }
+
     if (dumpRooms){
         mapRooms = cJSON_AddArrayToObject(info, "rooms");
 
@@ -636,10 +640,12 @@ int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, b
         roomIndex += 1;
     }
 
-    // There's only 4 collision maps for HallsOfVaught, so we just need a number that uniquely identifies which array we've got.
-    // Should just indentify by the first different index at some stage instead of this stuff.
     int *map;
     int nihlathakDirection = 0;
+    int lowerKurastExitSide = 0;
+
+    // There's only 4 collision maps for HallsOfVaught, so we just need a number that uniquely identifies which array we've got.
+    // Should just identify by the first different index at some stage instead of this stuff.
     if (pLevel->dwLevelNo == AreaLevel::HallsOfVaught){
         map = map_get();
         for (int i = 0; i < 1500 * 1500; i++){
@@ -656,7 +662,24 @@ int d2_dump_map(int seed, int difficulty, int levelCode, cJSON* mapsInfoArray, b
         nihlathakDirection &= 7;        
     }
 
-    MapInfo mapInfo = {"map", seed, difficulty, levelCode, levelName, originX, originY, mapWidth, mapHeight, nihlathakDirection, mapRooms, mapObjects};
+    // Only 2 ways the collision map for the first row can go.
+    if (pLevel->dwLevelNo == AreaLevel::LowerKurast){
+        map = map_get();
+        if(map_value(55, 0) == 0){
+            lowerKurastExitSide = 0;
+        } else {
+            lowerKurastExitSide = 1;
+        }        
+    }
+    
+
+    MapInfo mapInfo = {
+        "map", seed, difficulty, levelCode, levelName, originX, originY, mapWidth, mapHeight, 
+        nihlathakDirection, 
+        lowerKurastExitSide, 
+        mapRooms, 
+        mapObjects
+    };
     log_trace("MapDump");
 
     map_info_to_json(&mapInfo, seed, difficulty, mapsInfoArray, dumpRooms, dumpCollision);

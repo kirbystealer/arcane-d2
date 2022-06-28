@@ -7,7 +7,7 @@ GIT_HASH=${GIT_HASH:-$(git rev-parse HEAD)}
 echo $GIT_VERSION
 echo $GIT_HASH
 
-i686-w64-mingw32-g++ -g -o bin/d2-map.exe \
+i686-w64-mingw32-g++ -ggdb -gdwarf-2 -fno-omit-frame-pointer -o bin/d2-map.exe \
     -Wno-write-strings \
     -static-libgcc -static-libstdc++ \
     -DGIT_VERSION=\"${GIT_VERSION}\" \

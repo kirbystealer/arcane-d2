@@ -215,16 +215,22 @@ int main(int argc, char *argv[]) {
         for (int i = argSeed; i < argSeed + numSeed; i++){
             log_debug("Generating maps for seed: ", lk_ui("seed", i));
            
+
             mapsInfoArray = cJSON_CreateArray();            
             dump_maps(i, argDifficulty, -1, -1, mapsInfoArray, dumpRooms, dumpCollision);
+            char* jsonOutput = cJSON_PrintUnformatted(mapsInfoArray);
             
-            printf("%s", cJSON_PrintUnformatted(mapsInfoArray));
-            if (i != argSeed + numSeed - 1) printf(",\n");
+            if (i != argSeed + numSeed - 1){
+                printf("%s,\n", jsonOutput);            
+            } else {
+                printf("%s", jsonOutput);
+            }
 
+            cJSON_free(jsonOutput);
             cJSON_Delete(mapsInfoArray);
 
         }
-        printf("]");
+        printf("\n]");
         return 0;
     }
 

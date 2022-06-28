@@ -45,6 +45,7 @@ typedef struct
     int width;
     int height;
     int nihlathakDirection;
+    int lowerKurastExitSide;
     MapInfoRooms rooms;
     MapInfoObjects objects;
 } MapInfo;
