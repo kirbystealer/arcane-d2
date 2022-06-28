@@ -143,7 +143,7 @@ void d2_game_init_pd2() {
     log_debug("Init:Dll:Done", lk_s("dll", "D2Client.dll"));
 }
 
-void d2_game_init(char *folderName) {
+void d2_game_init(char *folderName, bool doPatch) {
     log_debug("Init:Dll", lk_s("path", folderName));
 
     gameVersion = game_version(folderName);
@@ -186,8 +186,7 @@ void d2_game_init(char *folderName) {
 
     // fprintf(stderr, "Press Any Key to Continue\n");
     // getchar();
-
-    // PatchDlls();
+    if (doPatch) PatchDlls();
 
     if (gameVersion == VersionPathOfDiablo) {
         d2_game_init_pod();

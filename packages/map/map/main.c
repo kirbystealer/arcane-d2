@@ -98,7 +98,7 @@ bool is_arcane_map(int mapId){
 
         // case AreaLevel::TheAncientsWay: // Glacial Caves
 
-        case AreaLevel::ClawViperTempleLevel1:
+        case AreaLevel::UndergroundPassageLevel1:
             return true;
         default:
             return false;
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 
 
     int64_t initStartTime = currentTimeMillis();
-    d2_game_init(gameFolder);
+    d2_game_init(gameFolder, arcaneMapsOnly);
     int64_t duration = currentTimeMillis() - initStartTime;
     log_info("Map:Init:Done", lk_s("version", GIT_VERSION), lk_s("hash", GIT_HASH), lk_i("duration", duration));
 
@@ -231,15 +231,30 @@ int main(int argc, char *argv[]) {
         for (int i = argSeed; i < argSeed + numSeed; i++){
             log_debug("Generating maps for seed: ", lk_ui("seed", i));
            
-                int j = 14;
-            // for (int j = 0; j < 15; j++){       
-                // D2CommonMazeIncrement = j;
+            if (arcaneMapsOnly){
+                for (int j = 0; j < 15; j++){       
+                    D2CommonMazeIncrement = j;
+                    mapsInfoArray = cJSON_CreateArray();     
+                    dump_maps(i, argDifficulty, -1, -1, mapsInfoArray, dumpRooms, dumpCollision, arcaneMapsOnly);
+                
+                    char* jsonOutput = cJSON_PrintUnformatted(mapsInfoArray);
+                    
+                    if (i == argSeed + numSeed - 1 && j == 14){
+                        printf("%s\n", jsonOutput);            
+                    } else {
+                        printf("%s,\n", jsonOutput);
+                    }
+
+                    cJSON_free(jsonOutput);
+                    cJSON_Delete(mapsInfoArray);
+                }
+            } else {
                 mapsInfoArray = cJSON_CreateArray();     
                 dump_maps(i, argDifficulty, -1, -1, mapsInfoArray, dumpRooms, dumpCollision, arcaneMapsOnly);
             
                 char* jsonOutput = cJSON_PrintUnformatted(mapsInfoArray);
                 
-                if (i == argSeed + numSeed - 1 && j == 14){
+                if (i == argSeed + numSeed - 1){
                     printf("%s\n", jsonOutput);            
                 } else {
                     printf("%s,\n", jsonOutput);
@@ -247,8 +262,8 @@ int main(int argc, char *argv[]) {
 
                 cJSON_free(jsonOutput);
                 cJSON_Delete(mapsInfoArray);
-            // }
-            // printf("\n")
+            }
+            printf("\n");
 
         }
         printf("\n]");

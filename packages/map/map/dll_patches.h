@@ -4,7 +4,6 @@
 #include <windows.h>
 
 extern "C" volatile int D2CommonMazeIncrement __asm__ ("MazeIncrement");
-extern "C" volatile void setIncrement(int n);
 
 DWORD PatchDlls();
 
